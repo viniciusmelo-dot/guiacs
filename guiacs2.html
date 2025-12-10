@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel CS RetenMax - Persistente</title>
+    
+    <!-- Tailwind CSS (Estilos) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM (Core do App) -->
+    <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js"></script>
+    
+    <!-- Dependência Auxiliar -->
+    <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+    
+    <!-- Recharts (Gráficos) -->
+    <script crossorigin src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Estilos Adicionais -->
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #fff7ed; }
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* Scrollbar fina para o modal */
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body>
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // --- CONFIGURAÇÃO DE AMBIENTE ---
+        const { useState, useMemo, useEffect, useRef } = React;
+        
+        const { 
+            BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
+            ResponsiveContainer, PieChart, Pie, Cell 
+        } = window.Recharts || {};
+
+        if (!window.Recharts) console.error("Erro: Recharts não carregado.");
+
+        // --- ÍCONES ---
+        const IconBase = ({ children, color = "currentColor", size = 20, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>
+        );
+        const Users = (p) => <IconBase {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></IconBase>;
+        const DollarSign = (p) => <IconBase {...p}><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></IconBase>;
+        const Activity = (p) => <IconBase {...p}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></IconBase>;
+        const CheckCircle = (p) => <IconBase {...p}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></IconBase>;
+        const TrendingUp = (p) => <IconBase {...p}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></IconBase>;
+        const LayoutGrid = (p) => <IconBase {...p}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></IconBase>;
+        const TableIcon = (p) => <IconBase {...p}><path d="M12 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7m-9-16h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-14a2 2 0 0 1 2-2z"/></IconBase>;
+        const Filter = (p) => <IconBase {...p}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></IconBase>;
+        const Plus = (p) => <IconBase {...p}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></IconBase>;
+        const LinkIcon = (p) => <IconBase {...p}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></IconBase>;
+        const Search = (p) => <IconBase {...p}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></IconBase>;
+        const Settings = (p) => <IconBase {...p}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></IconBase>;
+        const X = (p) => <IconBase {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></IconBase>;
+        const Save = (p) => <IconBase {...p}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></IconBase>;
+        const Download = (p) => <IconBase {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></IconBase>;
+        const Database = (p) => <IconBase {...p}><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></IconBase>;
+        const Upload = (p) => <IconBase {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></IconBase>;
+
+        // --- DADOS E HELPERS ---
+        const VERTICAIS = ['RMax', 'RMaster', 'FinMax', 'MaxIA', 'ElevaMAX'];
+        const REGIMES = ['Simples', 'Real', 'Presumido', 'Outro'];
+        const ORIGENS = ['Indicação', 'Meta/Google', 'Networking', 'Redes Sociais'];
+
+        const INITIAL_DATA = [
+            { id: 1, nome: "TechSolutions Ltda", vertical: "RMax", status: "Ativo", regime: "Real", origem: "Indicação", usuariosAlvo: 50, usuariosAtivos: 48, dataAssinatura: "2024-01-15", tempoContrato: 24, dataSaida: "", motivoSaida: "Cancelamento", primeiroValor: "2024-02-15", onboardingItens: 10, onboardingConcluidos: 10, slaResposta: 2, treinamentos: "Sim", csatPosOnb: 4.8, setup: 5000, mrr: 2500, nps: 75, healthScore: 90, posicao9Box: 9, reclamacoes: 0, obs: "Adoção plena." },
+            { id: 101, nome: "TechSolutions Ltda", vertical: "MaxIA", status: "Ativo", regime: "Real", origem: "Indicação", usuariosAlvo: 10, usuariosAtivos: 2, dataAssinatura: "2024-06-01", tempoContrato: 12, dataSaida: "", motivoSaida: "Cancelamento", primeiroValor: "2024-07-01", onboardingItens: 5, onboardingConcluidos: 2, slaResposta: 5, treinamentos: "Não", csatPosOnb: 3.0, setup: 1000, mrr: 1500, nps: 50, healthScore: 60, posicao9Box: 5, reclamacoes: 1, obs: "Dificuldade técnica na integração." },
+            { id: 2, nome: "Varejo Express", vertical: "RMaster", status: "Ativo", regime: "Simples", origem: "Meta/Google", usuariosAlvo: 20, usuariosAtivos: 10, dataAssinatura: "2024-03-01", tempoContrato: 12, dataSaida: "", motivoSaida: "Cancelamento", primeiroValor: "2024-04-15", onboardingItens: 10, onboardingConcluidos: 8, slaResposta: 12, treinamentos: "Parcial", csatPosOnb: 3.5, setup: 2000, mrr: 1200, nps: 40, healthScore: 60, posicao9Box: 4, reclamacoes: 2, obs: "Cliente pede desconto." },
+            { id: 3, nome: "Consultoria Alpha", vertical: "ElevaMAX", status: "Inativo", regime: "Presumido", origem: "Networking", usuariosAlvo: 10, usuariosAtivos: 2, dataAssinatura: "2023-06-01", tempoContrato: 12, dataSaida: "2024-01-01", motivoSaida: "Cancelamento", primeiroValor: "2023-08-01", onboardingItens: 8, onboardingConcluidos: 5, slaResposta: 24, treinamentos: "Não", csatPosOnb: 2.0, setup: 1500, mrr: 800, nps: 10, healthScore: 30, posicao9Box: 1, reclamacoes: 5, obs: "Cancelado por falta de uso." },
+            { id: 4, nome: "Grupo Financeiro Sul", vertical: "FinMax", status: "Ativo", regime: "Real", origem: "Indicação", usuariosAlvo: 100, usuariosAtivos: 98, dataAssinatura: "2023-11-10", tempoContrato: 36, dataSaida: "", motivoSaida: "Cancelamento", primeiroValor: "2023-12-01", onboardingItens: 15, onboardingConcluidos: 15, slaResposta: 2, treinamentos: "Sim", csatPosOnb: 5.0, setup: 15000, mrr: 8000, nps: 90, healthScore: 98, posicao9Box: 9, reclamacoes: 0, obs: "Vertical principal." }
+        ];
+
+        const calculateDaysDiff = (date1, date2) => {
+            if (!date1 || !date2) return 0;
+            const d1 = new Date(date1);
+            const d2 = new Date(date2);
+            const diffTime = Math.abs(d2 - d1);
+            return Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+        };
+
+        const calculateMonthsDiff = (date1, date2) => {
+            if (!date1 || !date2) return 0;
+            const d1 = new Date(date1);
+            const d2 = new Date(date2);
+            return (d2.getFullYear() - d1.getFullYear()) * 12 + (d2.getMonth() - d1.getMonth());
+        };
+
+        const formatCurrency = (value) => {
+            return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+        };
+
+        const convertArrayToCSV = (arr) => {
+            if (!arr || !arr.length) return null;
+            const columnDelimiter = ',';
+            const lineDelimiter = '\n';
+            const keys = Object.keys(arr[0]);
+            let result = '';
+            result += keys.join(columnDelimiter);
+            result += lineDelimiter;
+            arr.forEach(item => {
+                let ctr = 0;
+                keys.forEach(key => {
+                    if (ctr > 0) result += columnDelimiter;
+                    let val = item[key] ? item[key].toString().replace(/,/g, ' ') : ''; 
+                    result += val;
+                    ctr++;
+                });
+                result += lineDelimiter;
+            });
+            return result;
+        };
+
+        const downloadCSV = (data, filename) => {
+            const csv = convertArrayToCSV(data);
+            if (!csv) return;
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            if (link.download !== undefined) { 
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", filename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        };
+
+        // --- COMPONENTE: MODAL DE DADOS/BACKUP ---
+        const DataManagementModal = ({ isOpen, onClose, contracts, onImport }) => {
+            const fileInputRef = useRef(null);
+
+            const handleBackup = () => {
+                const dataStr = JSON.stringify(contracts, null, 2);
+                const blob = new Blob([dataStr], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.download = `backup_retenmax_${new Date().toISOString().slice(0,10)}.json`;
+                link.href = url;
+                link.click();
+            };
+
+            const handleRestoreClick = () => {
+                fileInputRef.current.click();
+            };
+
+            const handleFileChange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const parsedData = JSON.parse(event.target.result);
+                        if (Array.isArray(parsedData)) {
+                            onImport(parsedData);
+                            alert("Dados restaurados com sucesso!");
+                            onClose();
+                        } else {
+                            alert("Arquivo inválido. O formato deve ser uma lista de contratos.");
+                        }
+                    } catch (err) {
+                        alert("Erro ao ler o arquivo. Certifique-se de que é um JSON válido.");
+                    }
+                };
+                reader.readAsText(file);
+            };
+
+            const handleClearData = () => {
+                if(confirm("Tem certeza? Isso apagará todos os dados locais e restaurará o exemplo inicial. Faça um backup antes!")) {
+                    localStorage.removeItem('retenmax_data');
+                    window.location.reload();
+                }
+            };
+
+            if (!isOpen) return null;
+
+            return (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 border border-orange-100">
+                        <div className="flex justify-between items-center mb-4 border-b pb-2">
+                            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                <Database size={20} className="text-orange-600"/> Gestão de Dados
+                            </h3>
+                            <button onClick={onClose}><X size={20} className="text-slate-400 hover:text-slate-600" /></button>
+                        </div>
+                        
+                        <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-xs text-orange-800 mb-6">
+                            <strong>Atenção:</strong> Como este sistema roda localmente no seu computador, os dados são salvos automaticamente no seu navegador. 
+                            <br/><br/>
+                            Recomendamos fazer o <strong>Download do Backup</strong> regularmente para garantir a segurança das informações.
+                        </div>
+
+                        <div className="space-y-4">
+                            <button 
+                                onClick={handleBackup}
+                                className="w-full flex items-center justify-center gap-2 p-3 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition"
+                            >
+                                <Download size={18} /> Salvar Backup (Arquivo .JSON)
+                            </button>
+
+                            <div className="relative">
+                                <input 
+                                    type="file" 
+                                    ref={fileInputRef}
+                                    onChange={handleFileChange}
+                                    className="hidden" 
+                                    accept=".json"
+                                />
+                                <button 
+                                    onClick={handleRestoreClick}
+                                    className="w-full flex items-center justify-center gap-2 p-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition"
+                                >
+                                    <Upload size={18} /> Restaurar Backup
+                                </button>
+                            </div>
+
+                            <button 
+                                onClick={handleClearData}
+                                className="w-full text-center text-xs text-red-500 hover:text-red-700 mt-4 underline"
+                            >
+                                Limpar dados e restaurar padrão
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const ExportSettingsModal = ({ isOpen, onClose, onExport }) => {
+            const [startDate, setStartDate] = useState('');
+            const [endDate, setEndDate] = useState('');
+            const [vertical, setVertical] = useState('Todas');
+
+            if (!isOpen) return null;
+
+            return (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 border border-orange-100">
+                        <div className="flex justify-between items-center mb-4 border-b pb-2">
+                            <h3 className="text-lg font-bold text-slate-800">Exportar Relatório (Excel/CSV)</h3>
+                            <button onClick={onClose}><X size={20} className="text-slate-400 hover:text-slate-600" /></button>
+                        </div>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold text-slate-600 mb-1">Período (Data de Assinatura)</label>
+                                <div className="flex gap-2">
+                                    <input type="date" className="w-full text-sm p-2 border rounded" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                                    <input type="date" className="w-full text-sm p-2 border rounded" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-slate-600 mb-1">Filtrar por Vertical</label>
+                                <select className="w-full text-sm p-2 border rounded" value={vertical} onChange={e => setVertical(e.target.value)}>
+                                    <option value="Todas">Todas</option>
+                                    {VERTICAIS.map(v => <option key={v} value={v}>{v}</option>)}
+                                </select>
+                            </div>
+                        </div>
+                        <div className="mt-6 flex justify-end gap-2">
+                            <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded">Cancelar</button>
+                            <button 
+                                onClick={() => onExport({ startDate, endDate, vertical })}
+                                className="px-4 py-2 text-sm bg-orange-600 hover:bg-orange-700 text-white rounded shadow-sm flex items-center gap-2"
+                            >
+                                <Download size={16} /> Baixar Relatório
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const ContractFormModal = ({ isOpen, onClose, contract, onSave, existingClients }) => {
+            const [formData, setFormData] = useState({
+                nome: '', vertical: 'RMax', status: 'Ativo', regime: 'Real', origem: 'Indicação',
+                mrr: 0, setup: 0, dataAssinatura: '', tempoContrato: 12, primeiroValor: '',
+                healthScore: 75, posicao9Box: 5, nps: 0, csatPosOnb: 0,
+                usuariosAlvo: 0, usuariosAtivos: 0, onboardingItens: 10, onboardingConcluidos: 0,
+                reclamacoes: 0, obs: '', slaResposta: 24, treinamentos: 'Em andamento',
+                dataSaida: '', motivoSaida: 'Cancelamento'
+            });
+
+            useEffect(() => {
+                if (isOpen) {
+                    if (contract) {
+                        setFormData({ ...contract });
+                    } else {
+                        // Reset para novo
+                        setFormData({
+                            nome: '', vertical: 'RMax', status: 'Ativo', regime: 'Real', origem: 'Indicação',
+                            mrr: 0, setup: 0, dataAssinatura: new Date().toISOString().split('T')[0], tempoContrato: 12, primeiroValor: '',
+                            healthScore: 75, posicao9Box: 5, nps: 0, csatPosOnb: 0,
+                            usuariosAlvo: 0, usuariosAtivos: 0, onboardingItens: 10, onboardingConcluidos: 0,
+                            reclamacoes: 0, obs: '', slaResposta: 24, treinamentos: 'Em andamento',
+                            dataSaida: '', motivoSaida: 'Cancelamento'
+                        });
+                    }
+                }
+            }, [isOpen, contract]);
+
+            if (!isOpen) return null;
+
+            const handleChange = (e) => {
+                const { name, value, type } = e.target;
+                setFormData(prev => ({
+                    ...prev,
+                    [name]: type === 'number' ? parseFloat(value) : value
+                }));
+            };
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (!formData.nome) return alert("Nome do cliente é obrigatório");
+                onSave(formData);
+                onClose();
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto border border-orange-100 flex flex-col">
+                        <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-orange-50 sticky top-0 z-10">
+                            <h3 className="text-lg font-bold text-slate-800">{contract ? 'Editar Contrato' : 'Novo Contrato / Adicionar Vertical'}</h3>
+                            <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+                        </div>
+                        
+                        <form onSubmit={handleSubmit} className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                            
+                            {/* SEÇÃO 1: DADOS GERAIS */}
+                            <div className="space-y-4">
+                                <h4 className="font-bold text-orange-600 text-sm uppercase border-b border-orange-100 pb-1">Dados Gerais</h4>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-600 mb-1">Nome do Cliente</label>
+                                    <input 
+                                        list="clients-list" 
+                                        name="nome" 
+                                        value={formData.nome} 
+                                        onChange={handleChange} 
+                                        className="w-full text-sm p-2 border border-slate-300 rounded focus:ring-orange-500" 
+                                        placeholder="Digite ou selecione existente..."
+                                        required
+                                    />
+                                    <datalist id="clients-list">
+                                        {existingClients.map((name, i) => <option key={i} value={name} />)}
+                                    </datalist>
+                                    <p className="text-[10px] text-slate-400 mt-1">💡 Use o mesmo nome para agrupar como Intervertical.</p>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-600 mb-1">Vertical</label>
+                                        <select name="vertical" value={formData.vertical} onChange={handleChange} className="w-full text-sm p-2 border border-slate-300 rounded">
+                                            {VERTICAIS.map(v => <option key={v} value={v}>{v}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-600 mb-1">Status</label>
+                                        <select name="status" value={formData.status} onChange={handleChange} className="w-full text-sm p-2 border border-slate-300 rounded">
+                                            <option value="Ativo">Ativo</option>
+                                            <option value="Inativo">Inativo</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-600 mb-1">Regime</label>
+                                        <select name="regime" value={formData.regime} onChange={handleChange} className="w-full text-sm p-2 border border-slate-300 rounded">
+                                            {REGIMES.map(r => <option key={r} value={r}>{r}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-600 mb-1">Origem</label>
+                                        <select name="origem" value={formData.origem} onChange={handleChange} className="w-full text-sm p-2 border border-slate-300 rounded">
+                                            {ORIGENS.map(o => <option key={o} value={o}>{o}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-600 mb-1">Observações</label>
+                                    <textarea name="obs" value={formData.obs} onChange={handleChange} rows={3} className="w-full text-sm p-2 border border-slate-300 rounded"></textarea>
+                                </div>
+                            </div>
+
+                            {/* SEÇÃO 2: FINANCEIRO E DATAS */}
+                            <div className="space-y-4">
+                                <h4 className="font-bold text-orange-600 text-sm uppercase border-b border-orange-100 pb-1">Financeiro & Prazos</h4>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-600 mb-1">MRR (R$)</label>
+                                        <input type="number" name="mrr" value={formData.mrr} onChange={handleChange} className="w-full text-sm p-2 border border-slate-300 rounded" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-600 mb-1">Setup (R$)</label>
+                                        <input type="number" name="setup" value={formData.setup} onChange={handleChange} className="w-full text-sm p-2 border border-slate-300 rounded" />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-600 mb-1">Data Assinatura</label>
+                                        <input type="date" name="dataAssinatura" value={formData.dataAssinatura} onChange={handleChange} className="w-full text-sm p-2 border border-slate-300 rounded" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-600 mb-1">Meses Contrato</label>
+                                        <input type="number" name="tempoContrato" value={formData.tempoContrato} onChange={handleChange} className="w-full text-sm p-2 border border-slate-300 rounded" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-600 mb-1">Data Primeiro Valor (TTV)</label>
+                                    <input type="date" name="primeiroValor" value={formData.primeiroValor} onChange={handleChange} className="w-full text-sm p-2 border border-slate-300 rounded" />
+                                </div>
+                                
+                                {formData.status === 'Inativo' && (
+                                    <div className="bg-red-50 p-3 rounded border border-red-200 mt-2">
+                                        <label className="block text-xs font-bold text-red-700 mb-1">Dados de Saída</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <input type="date" name="dataSaida" value={formData.dataSaida} onChange={handleChange} className="text-xs p-1 border rounded" required />
+                                            <select name="motivoSaida" value={formData.motivoSaida} onChange={handleChange} className="text-xs p-1 border rounded">
+                                                <option value="Cancelamento">Cancelamento (Churn)</option>
+                                                <option value="Contrato Concluido">Fim de Contrato</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* SEÇÃO 3: INDICADORES */}
+                            <div className="space-y-4 md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-slate-100">
+                                <div>
+                                    <h4 className="font-bold text-orange-600 text-sm uppercase mb-2">Saúde & Score</h4>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center"><label className="text-xs">Health Score (0-100)</label><input type="number" name="healthScore" value={formData.healthScore} onChange={handleChange} className="w-16 text-xs p-1 border rounded" /></div>
+                                        <div className="flex justify-between items-center"><label className="text-xs">9Box (1-9)</label><input type="number" name="posicao9Box" value={formData.posicao9Box} onChange={handleChange} className="w-16 text-xs p-1 border rounded" /></div>
+                                        <div className="flex justify-between items-center"><label className="text-xs">NPS</label><input type="number" name="nps" value={formData.nps} onChange={handleChange} className="w-16 text-xs p-1 border rounded" /></div>
+                                        <div className="flex justify-between items-center"><label className="text-xs">CSAT (0-5)</label><input type="number" name="csatPosOnb" value={formData.csatPosOnb} onChange={handleChange} className="w-16 text-xs p-1 border rounded" /></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-orange-600 text-sm uppercase mb-2">Adoção & Uso</h4>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center"><label className="text-xs">Usuários Alvo</label><input type="number" name="usuariosAlvo" value={formData.usuariosAlvo} onChange={handleChange} className="w-16 text-xs p-1 border rounded" /></div>
+                                        <div className="flex justify-between items-center"><label className="text-xs">Usuários Ativos</label><input type="number" name="usuariosAtivos" value={formData.usuariosAtivos} onChange={handleChange} className="w-16 text-xs p-1 border rounded" /></div>
+                                        <div className="flex justify-between items-center"><label className="text-xs">Itens Onboarding</label><input type="number" name="onboardingItens" value={formData.onboardingItens} onChange={handleChange} className="w-16 text-xs p-1 border rounded" /></div>
+                                        <div className="flex justify-between items-center"><label className="text-xs">Itens Concluídos</label><input type="number" name="onboardingConcluidos" value={formData.onboardingConcluidos} onChange={handleChange} className="w-16 text-xs p-1 border rounded" /></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-orange-600 text-sm uppercase mb-2">Suporte & Outros</h4>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center"><label className="text-xs">SLA Médio (h)</label><input type="number" name="slaResposta" value={formData.slaResposta} onChange={handleChange} className="w-16 text-xs p-1 border rounded" /></div>
+                                        <div className="flex justify-between items-center"><label className="text-xs">Reclamações</label><input type="number" name="reclamacoes" value={formData.reclamacoes} onChange={handleChange} className="w-16 text-xs p-1 border rounded" /></div>
+                                        <div className="flex flex-col mt-2"><label className="text-xs mb-1">Status Treinamento</label><input type="text" name="treinamentos" value={formData.treinamentos} onChange={handleChange} className="text-xs p-1 border rounded" /></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </form>
+                        
+                        <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 sticky bottom-0">
+                            <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-200 rounded transition">Cancelar</button>
+                            <button onClick={handleSubmit} className="px-6 py-2 text-sm bg-orange-600 hover:bg-orange-700 text-white rounded shadow-sm font-medium flex items-center gap-2 transition">
+                                <Save size={16} /> Salvar Dados
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const KPICard = ({ title, value, subtext, icon: Icon, color = "orange" }) => (
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-orange-100 flex items-start space-x-4 hover:shadow-md transition-shadow">
+                <div className={`p-3 rounded-lg bg-${color}-100 text-${color}-600`}><Icon size={24} /></div>
+                <div><h3 className="text-sm font-medium text-slate-500">{title}</h3><div className="text-2xl font-bold text-slate-800">{value}</div>{subtext && <div className="text-xs text-slate-400 mt-1">{subtext}</div>}</div>
+            </div>
+        );
+
+        const Badge = ({ children, type }) => {
+            const styles = { "Ativo": "bg-green-100 text-green-800 border-green-200", "Inativo": "bg-slate-100 text-slate-600 border-slate-200", "Cancelamento": "bg-red-100 text-red-800 border-red-200 font-bold", "Contrato Concluido": "bg-blue-100 text-blue-800 border-blue-200" };
+            return <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${styles[children] || styles[type] || "bg-slate-100 text-slate-600 border-slate-200"}`}>{children}</span>;
+        };
+
+        // --- APLICAÇÃO ---
+        function App() {
+            // Inicializa estado com dados do LocalStorage se existirem, senão usa os dados iniciais
+            const [contracts, setContracts] = useState(() => {
+                const saved = localStorage.getItem('retenmax_data');
+                return saved ? JSON.parse(saved) : INITIAL_DATA;
+            });
+
+            // Salva no LocalStorage toda vez que 'contracts' muda
+            useEffect(() => {
+                localStorage.setItem('retenmax_data', JSON.stringify(contracts));
+            }, [contracts]);
+
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [modalOpen, setModalOpen] = useState(false);
+            const [exportModalOpen, setExportModalOpen] = useState(false);
+            const [dataModalOpen, setDataModalOpen] = useState(false);
+            const [selectedContract, setSelectedContract] = useState(null);
+
+            // Novos Filtros
+            const [showInterverticalOnly, setShowInterverticalOnly] = useState(false);
+            const [verticalFilter, setVerticalFilter] = useState('Todas');
+            const [statusFilter, setStatusFilter] = useState('Todos');
+            const [healthFilter, setHealthFilter] = useState('Todos');
+            const [searchTerm, setSearchTerm] = useState('');
+
+            const uniqueClientNames = useMemo(() => [...new Set(contracts.map(c => c.nome))], [contracts]);
+            const clientContractCounts = useMemo(() => {
+                const counts = {};
+                contracts.forEach(c => { counts[c.nome] = (counts[c.nome] || 0) + 1; });
+                return counts;
+            }, [contracts]);
+
+            const handleNewContract = () => { setSelectedContract(null); setModalOpen(true); };
+            const handleEditClick = (contract) => { setSelectedContract(contract); setModalOpen(true); };
+
+            const handleSaveContract = (formData) => {
+                if (selectedContract) {
+                    setContracts(prev => prev.map(c => c.id === selectedContract.id ? { ...c, ...formData } : c));
+                } else {
+                    const newId = Math.max(...contracts.map(c => c.id), 0) + 1;
+                    setContracts(prev => [...prev, { ...formData, id: newId }]);
+                }
+                setModalOpen(false);
+            };
+
+            const handleImportData = (newData) => {
+                if(confirm("Isso substituirá todos os dados atuais pelos dados do arquivo. Deseja continuar?")) {
+                    setContracts(newData);
+                }
+            };
+
+            const handleExport = ({ startDate, endDate, vertical }) => {
+                const dataToExport = contracts.filter(c => {
+                    const matchVertical = vertical === 'Todas' || c.vertical === vertical;
+                    const cDate = new Date(c.dataAssinatura);
+                    const start = startDate ? new Date(startDate) : null;
+                    const end = endDate ? new Date(endDate) : null;
+                    const matchDate = (!start || cDate >= start) && (!end || cDate <= end);
+                    return matchVertical && matchDate;
+                });
+                downloadCSV(dataToExport, `relatorio_retenmax_${new Date().toISOString().slice(0,10)}.csv`);
+                setExportModalOpen(false);
+            };
+
+            const filteredData = useMemo(() => {
+                return contracts.filter(c => {
+                    const matchVertical = verticalFilter === 'Todas' || c.vertical === verticalFilter;
+                    const matchStatus = statusFilter === 'Todos' || c.status === statusFilter;
+                    const matchSearch = c.nome.toLowerCase().includes(searchTerm.toLowerCase());
+                    let matchHealth = true;
+                    if (healthFilter === 'Critico') matchHealth = c.healthScore <= 50;
+                    if (healthFilter === 'Atencao') matchHealth = c.healthScore > 50 && c.healthScore <= 75;
+                    if (healthFilter === 'Saudavel') matchHealth = c.healthScore > 75;
+                    let matchIntervertical = true;
+                    if (showInterverticalOnly) {
+                        matchIntervertical = clientContractCounts[c.nome] > 1;
+                    }
+                    return matchVertical && matchStatus && matchHealth && matchSearch && matchIntervertical;
+                });
+            }, [contracts, verticalFilter, statusFilter, healthFilter, searchTerm, showInterverticalOnly, clientContractCounts]);
+
+            const metrics = useMemo(() => {
+                const activeContracts = filteredData.filter(c => c.status === 'Ativo');
+                const churnedContracts = filteredData.filter(c => c.status === 'Inativo' && c.motivoSaida === 'Cancelamento');
+                const totalMRR = activeContracts.reduce((acc, curr) => acc + curr.mrr, 0);
+                const avgMRR = totalMRR / (activeContracts.length || 1);
+                const totalARR = totalMRR * 12;
+
+                const totalTTV = filteredData.reduce((acc, curr) => {
+                    if (curr.primeiroValor && curr.dataAssinatura) return acc + calculateDaysDiff(curr.dataAssinatura, curr.primeiroValor);
+                    return acc;
+                }, 0);
+                const countTTV = filteredData.filter(c => c.primeiroValor && c.dataAssinatura).length;
+                const avgTTV = countTTV ? (totalTTV / countTTV).toFixed(0) : 0;
+
+                const totalAdoptionRate = activeContracts.reduce((acc, curr) => acc + ((curr.usuariosAtivos / (curr.usuariosAlvo || 1)) * 100), 0);
+                const avgAdoption = (totalAdoptionRate / (activeContracts.length || 1)).toFixed(1);
+
+                const avgHealth = (activeContracts.reduce((acc, curr) => acc + curr.healthScore, 0) / (activeContracts.length || 1)).toFixed(1);
+                const avgNPS = (activeContracts.reduce((acc, curr) => acc + (curr.nps || 0), 0) / (activeContracts.filter(c => c.nps !== null).length || 1)).toFixed(1);
+                const churnRate = ((churnedContracts.length / (filteredData.length || 1)) * 100).toFixed(1);
+                
+                const avgLifespanMonths = churnedContracts.length > 0 
+                    ? churnedContracts.reduce((acc, c) => acc + calculateMonthsDiff(c.dataAssinatura, c.dataSaida), 0) / churnedContracts.length
+                    : activeContracts.reduce((acc, c) => acc + c.tempoContrato, 0) / (activeContracts.length || 1); 
+                const ltv = avgMRR * avgLifespanMonths;
+
+                return {
+                    totalContracts: filteredData.length, activeContracts: activeContracts.length, totalMRR, avgMRR, totalARR, avgTTV, avgAdoption, avgHealth, avgNPS, churnRate, ltv
+                };
+            }, [filteredData]);
+
+            const chartData = useMemo(() => {
+                const verticalData = {};
+                filteredData.filter(c => c.status === 'Ativo').forEach(c => { verticalData[c.vertical] = (verticalData[c.vertical] || 0) + c.mrr; });
+                const healthRanges = [ { name: 'Crítico (0-50)', value: 0, color: '#ef4444' }, { name: 'Atenção (51-75)', value: 0, color: '#f97316' }, { name: 'Saudável (76-100)', value: 0, color: '#22c55e' } ];
+                filteredData.filter(c => c.status === 'Ativo').forEach(c => {
+                    if (c.healthScore <= 50) healthRanges[0].value++;
+                    else if (c.healthScore <= 75) healthRanges[1].value++;
+                    else healthRanges[2].value++;
+                });
+                return { verticals: Object.keys(verticalData).map(k => ({ name: k, value: verticalData[k] })), health: healthRanges };
+            }, [filteredData]);
+
+            return (
+                <div className="min-h-screen bg-orange-50/30 text-slate-800 font-sans pb-10">
+                    <header className="bg-gradient-to-r from-orange-600 to-orange-700 text-white p-4 shadow-lg sticky top-0 z-20">
+                        <div className="max-w-7xl mx-auto flex justify-between items-center">
+                            <div className="flex items-center space-x-2"><div className="bg-white/20 p-1.5 rounded-lg backdrop-blur-sm"><Activity className="text-white" size={24} /></div><div><h1 className="text-xl font-bold tracking-wide">RETENMAX</h1><p className="text-xs text-orange-100 opacity-90">Controle Diretoria CS</p></div></div>
+                            <div className="flex bg-orange-800/30 p-1 rounded-lg">
+                                <button onClick={() => setActiveTab('dashboard')} className={`flex items-center space-x-2 px-4 py-2 rounded-md transition text-sm font-medium ${activeTab === 'dashboard' ? 'bg-white text-orange-700 shadow-sm' : 'text-orange-100 hover:bg-orange-600/50'}`}><LayoutGrid size={16} /> <span>Painel</span></button>
+                                <button onClick={() => setActiveTab('table')} className={`flex items-center space-x-2 px-4 py-2 rounded-md transition text-sm font-medium ${activeTab === 'table' ? 'bg-white text-orange-700 shadow-sm' : 'text-orange-100 hover:bg-orange-600/50'}`}><TableIcon size={16} /> <span>Base Geral</span></button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="max-w-7xl mx-auto p-6 space-y-6">
+                        <div className="bg-white p-4 rounded-xl shadow-sm border border-orange-100 flex flex-wrap gap-4 items-center justify-between">
+                            <div className="flex flex-wrap gap-4 items-center">
+                                <div className="flex items-center gap-2 text-sm"><Filter size={18} className="text-orange-500" /><span className="font-bold text-slate-700">Filtros:</span></div>
+                                <div className="flex flex-col"><span className="text-[10px] text-slate-400 font-semibold uppercase">Vertical</span><select className="bg-slate-50 border border-slate-200 rounded text-sm px-2 py-1" value={verticalFilter} onChange={(e) => setVerticalFilter(e.target.value)}><option value="Todas">Todas</option>{VERTICAIS.map(v => <option key={v} value={v}>{v}</option>)}</select></div>
+                                <div className="flex flex-col"><span className="text-[10px] text-slate-400 font-semibold uppercase">Status</span><select className="bg-slate-50 border border-slate-200 rounded text-sm px-2 py-1" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}><option value="Todos">Todos</option><option value="Ativo">Ativo</option><option value="Inativo">Inativo</option></select></div>
+                                <div className="flex flex-col"><span className="text-[10px] text-slate-400 font-semibold uppercase">Saúde</span><select className="bg-slate-50 border border-slate-200 rounded text-sm px-2 py-1" value={healthFilter} onChange={(e) => setHealthFilter(e.target.value)}><option value="Todos">Todos</option><option value="Critico">Crítico</option><option value="Atencao">Atenção</option><option value="Saudavel">Saudável</option></select></div>
+                            </div>
+                            <div className="flex gap-2 items-center">
+                                <div className="relative"><Search className="absolute left-2 top-2 text-slate-400" size={16} /><input type="text" placeholder="Buscar..." className="pl-8 pr-4 py-1.5 text-sm border border-slate-200 rounded-lg w-48" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
+                                <button 
+                                    onClick={() => setDataModalOpen(true)}
+                                    className="px-3 py-1.5 bg-slate-800 text-white rounded-lg text-sm font-medium hover:bg-slate-900 flex items-center gap-2"
+                                    title="Salvar/Restaurar Dados"
+                                >
+                                    <Database size={16} /> Dados / Backup
+                                </button>
+                            </div>
+                        </div>
+
+                        {activeTab === 'dashboard' && (
+                            <div className="space-y-6 fade-in">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <KPICard title="MRR Consolidado" value={formatCurrency(metrics.totalMRR)} subtext={`Médio: ${formatCurrency(metrics.avgMRR)}`} icon={DollarSign} color="green" />
+                                    <KPICard title="Contratos Ativos" value={metrics.activeContracts} subtext={`Total: ${metrics.totalContracts}`} icon={CheckCircle} color="orange" />
+                                    <KPICard title="Saúde Média" value={metrics.avgHealth} subtext={`NPS: ${metrics.avgNPS}`} icon={Activity} color={metrics.avgHealth > 75 ? "green" : "red"} />
+                                    <KPICard title="LTV Estimado" value={formatCurrency(metrics.ltv)} subtext="Base: Churn Histórico" icon={TrendingUp} color="blue" />
+                                </div>
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    <div className="bg-white p-5 rounded-xl shadow-sm border border-orange-100 lg:col-span-2">
+                                        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2"><DollarSign size={20} className="text-orange-500" /> Receita por Vertical</h3>
+                                        <div className="h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={chartData.verticals} layout="vertical" margin={{ left: 20 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" /><XAxis type="number" hide /><YAxis dataKey="name" type="category" width={80} tick={{fill: '#475569', fontSize: 12}} /><Tooltip formatter={(value) => formatCurrency(value)} /><Bar dataKey="value" fill="#f97316" radius={[0, 4, 4, 0]} barSize={32} /></BarChart></ResponsiveContainer></div>
+                                    </div>
+                                    <div className="bg-white p-5 rounded-xl shadow-sm border border-orange-100">
+                                        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2"><Activity size={20} className="text-orange-500" /> Saúde Carteira</h3>
+                                        <div className="h-72"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={chartData.health} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">{chartData.health.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}</Pie><Tooltip /><Legend verticalAlign="bottom" height={36}/></PieChart></ResponsiveContainer></div>
+                                    </div>
+                                </div>
+                                <div className="bg-white p-6 rounded-xl shadow-sm border border-orange-100">
+                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-6 text-center divide-x divide-slate-100">
+                                        <div><div className="text-2xl font-bold text-slate-800">{metrics.avgTTV}d</div><div className="text-xs text-slate-400 mt-1">TTV Médio</div></div>
+                                        <div><div className="text-2xl font-bold text-slate-800">{metrics.avgAdoption}%</div><div className="text-xs text-slate-400 mt-1">Adoção</div></div>
+                                        <div><div className="text-2xl font-bold text-red-500">{metrics.churnRate}%</div><div className="text-xs text-slate-400 mt-1">Churn Rate</div></div>
+                                        <div><div className="text-2xl font-bold text-slate-800">12h</div><div className="text-xs text-slate-400 mt-1">SLA Resp.</div></div>
+                                        <div><div className="text-2xl font-bold text-orange-500">{filteredData.reduce((acc, c) => acc + c.reclamacoes, 0)}</div><div className="text-xs text-slate-400 mt-1">Reclamações</div></div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'table' && (
+                            <div className="bg-white rounded-xl shadow-lg border border-orange-100 overflow-hidden fade-in">
+                                <div className="p-4 border-b border-orange-100 bg-orange-50/50 flex flex-col md:flex-row justify-between items-center gap-4">
+                                    <div><h2 className="font-bold text-slate-800 text-lg">Base de Contratos</h2><p className="text-xs text-slate-500">Detalhes por vertical</p></div>
+                                    
+                                    <div className="bg-slate-200 p-1 rounded-lg flex space-x-1">
+                                        <button onClick={() => setShowInterverticalOnly(false)} className={`px-3 py-1.5 rounded-md text-xs font-bold transition ${!showInterverticalOnly ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-500 hover:bg-slate-300'}`}>Todos os Contratos</button>
+                                        <button onClick={() => setShowInterverticalOnly(true)} className={`px-3 py-1.5 rounded-md text-xs font-bold transition flex items-center gap-1 ${showInterverticalOnly ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-500 hover:bg-slate-300'}`}><LinkIcon size={12} /> Apenas Interverticais</button>
+                                    </div>
+
+                                    <div className="flex gap-2">
+                                        <button onClick={handleNewContract} className="flex items-center space-x-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition"><Plus size={16} /><span>Novo / Vertical</span></button>
+                                        <button onClick={() => setExportModalOpen(true)} className="text-sm border border-orange-200 text-orange-700 px-3 py-2 rounded-lg hover:bg-orange-50 flex items-center gap-2"><Download size={14} /> Exportar</button>
+                                    </div>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-xs text-left">
+                                        <thead className="bg-slate-50 text-slate-600 uppercase font-bold">
+                                            <tr><th className="p-3 border-b text-center w-10">#</th><th className="p-3 border-b">Cliente</th><th className="p-3 border-b">Vertical</th><th className="p-3 border-b">Status</th><th className="p-3 border-b">Saúde/9Box</th><th className="p-3 border-b">Finanças</th><th className="p-3 border-b">Datas</th><th className="p-3 border-b">Obs</th></tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {filteredData.map((contract, idx) => {
+                                                const isIntervertical = clientContractCounts[contract.nome] > 1;
+                                                const ttv = calculateDaysDiff(contract.dataAssinatura, contract.primeiroValor);
+                                                return (
+                                                    <tr key={`${contract.id}-${idx}`} className={`hover:bg-orange-50/30 transition ${contract.status === 'Inativo' ? 'opacity-70 bg-slate-50' : ''}`}>
+                                                        <td className="p-3 border-b text-center">
+                                                            <button onClick={() => handleEditClick(contract)} className="text-slate-300 hover:text-orange-600 p-1 rounded-full hover:bg-orange-100" title="Editar Contrato"><Settings size={14} /></button>
+                                                        </td>
+                                                        <td className="p-3 border-b border-r border-slate-50 w-48 relative">
+                                                            {isIntervertical && <div className="absolute top-0 left-0 w-1 h-full bg-purple-400"></div>}
+                                                            <div className="font-bold text-slate-800 text-sm flex items-center gap-2">{contract.nome}</div>
+                                                            {isIntervertical && <div className="flex items-center gap-1 text-[10px] text-purple-600 mt-1 font-medium bg-purple-50 px-1.5 py-0.5 rounded w-fit"><LinkIcon size={10} /><span>Intervertical ({clientContractCounts[contract.nome]})</span></div>}
+                                                            <div className="text-slate-400 mt-1">{contract.origem}</div>
+                                                        </td>
+                                                        <td className="p-3 border-b"><span className="font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded border border-orange-100 mb-1 inline-block">{contract.vertical}</span><div className="text-[10px] text-slate-500 mt-1">Usuários: {contract.usuariosAtivos}/{contract.usuariosAlvo}</div></td>
+                                                        <td className="p-3 border-b"><Badge type={contract.status}>{contract.status}</Badge>{contract.status === 'Inativo' && contract.motivoSaida && <div className="mt-1"><Badge type={contract.motivoSaida}>{contract.motivoSaida}</Badge></div>}</td>
+                                                        <td className="p-3 border-b"><div className="flex items-center gap-4"><div><div className="text-[10px] text-slate-400">Saúde</div><div className={`font-bold text-sm ${contract.healthScore >= 75 ? 'text-green-600' : contract.healthScore >= 50 ? 'text-orange-500' : 'text-red-500'}`}>{contract.healthScore}</div></div><div><div className="text-[10px] text-slate-400">9Box</div><div className="font-bold text-slate-700 bg-slate-100 px-1.5 rounded">{contract.posicao9Box}</div></div></div></td>
+                                                        <td className="p-3 border-b"><div className="font-bold text-slate-700">{formatCurrency(contract.mrr)}</div><div className="text-[10px] text-slate-400">Setup: {formatCurrency(contract.setup)}</div></td>
+                                                        <td className="p-3 border-b"><div className="text-slate-700">{new Date(contract.dataAssinatura).toLocaleDateString('pt-BR')}</div><div className="mt-1 text-[10px]">{contract.primeiroValor ? <span className="text-slate-500">TTV: <b>{ttv}d</b></span> : <span className="text-orange-400 italic">...</span>}</div></td>
+                                                        <td className="p-3 border-b max-w-xs"><div className="truncate text-slate-500 text-[11px]" title={contract.obs}>{contract.obs}</div></td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+                    </main>
+
+                    <ContractFormModal 
+                        isOpen={modalOpen} 
+                        onClose={() => setModalOpen(false)} 
+                        contract={selectedContract} 
+                        onSave={handleSaveContract}
+                        existingClients={uniqueClientNames}
+                    />
+
+                    <ExportSettingsModal
+                        isOpen={exportModalOpen}
+                        onClose={() => setExportModalOpen(false)}
+                        onExport={handleExport}
+                    />
+
+                    <DataManagementModal
+                        isOpen={dataModalOpen}
+                        onClose={() => setDataModalOpen(false)}
+                        contracts={contracts}
+                        onImport={handleImportData}
+                    />
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
